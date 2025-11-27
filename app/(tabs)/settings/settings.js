@@ -2,8 +2,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Bell, BellOff, Calendar, Trash2 } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
-import { useApp } from '../../context/AppContext';
-import { styles } from '../../styles/globalStyles';
+
+import { useApp } from '../../../context/AppContext';
+import { styles } from '../../../styles/globalStyles';
 
 const SUBSCRIPTION_KEY = '@App:isSubscribedToTopic';
 
@@ -13,6 +14,7 @@ const RETENTION_MAP = {
     '1_month': '1 mês',
 };
 const RETENTION_OPTIONS = ['1_day', '1_week', '1_month']; 
+
 const getSubscriptionStatus = async () => {
     try {
         const status = await AsyncStorage.getItem(SUBSCRIPTION_KEY);
@@ -23,7 +25,7 @@ const getSubscriptionStatus = async () => {
     }
 };
 
-const SettingsScreen = () => {
+const Settings = () => {
     const { cleanOldData, getRetentionSetting, setRetentionSetting, subscribeToTopic, unsubscribeFromTopic } = useApp();
     
     const [retentionPeriod, setRetentionPeriod] = useState('1_week'); 
@@ -58,18 +60,33 @@ const SettingsScreen = () => {
     };
 
     const handleCleanDataNow = async () => {
-        try {
-            const changes = await cleanOldData();
-            Alert.alert('Limpeza Concluída', `${changes} registros antigos foram removidos.`);
-        } catch (error) {
-            Alert.alert('Erro', 'Falha ao limpar os dados.');
-        }
+        Alert.alert(
+            "Confirmar Limpeza",
+            "Tem certeza de que deseja remover os dados mais antigos que o período de retenção atual?",
+            [
+                {
+                    text: "Cancelar",
+                    style: "cancel"
+                },
+                { 
+                    text: "Sim, Limpar", 
+                    onPress: async () => {
+                        try {
+                            const changes = await cleanOldData();
+                            Alert.alert('Limpeza Concluída', `${changes} registros antigos foram removidos.`);
+                        } catch (error) {
+                            Alert.alert('Erro', 'Falha ao limpar os dados.');
+                        }
+                    },
+                    style: "destructive"
+                }
+            ]
+        );
     };
 
     return (
         <ScrollView style={[styles.container, { padding: 16 }]}>
             <Text style={styles.title}>Configurações</Text>
-            
             <View style={{ marginVertical: 20, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#EEE' }}>
                 <Text style={[styles.settingLabel, { marginBottom: 10 }]}>
                     Notificações da Colmeia
@@ -93,7 +110,6 @@ const SettingsScreen = () => {
                     />
                 </View>
             </View>
-        
             <View style={{ marginVertical: 20 }}>
                 <Text style={[styles.settingLabel, { marginBottom: 10 }]}>
                     Período de Retenção de Dados:
@@ -114,8 +130,9 @@ const SettingsScreen = () => {
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                 }}
-                               
-                                onPress={() => handleRetentionChange(periodKey)}><Calendar color={isSelected ? 'white' : '#424242'} size={18} />
+                                
+                                onPress={() => handleRetentionChange(periodKey)}>
+                                <Calendar color={isSelected ? 'white' : '#424242'} size={18} />
                                 <Text
                                     style={{
                                         marginLeft: 8,
@@ -131,7 +148,6 @@ const SettingsScreen = () => {
                     })}
                 </View>
             </View>
-
             <TouchableOpacity
                 style={{
                     backgroundColor: '#FFC107',
@@ -153,4 +169,4 @@ const SettingsScreen = () => {
     );
 };
 
-export default SettingsScreen;
+export default Settings;
