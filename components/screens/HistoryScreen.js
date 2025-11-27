@@ -20,7 +20,6 @@ const HistoryScreen = () => {
   const [isPickerVisible, setPickerVisible] = useState(false);
   const currentPickerTarget = useRef(null);
 
-  // Show date/time picker
   const showDateTimePicker = useCallback((target) => {
     currentPickerTarget.current = target;
     setPickerVisible(true);
@@ -71,11 +70,13 @@ const HistoryScreen = () => {
     }
   }, [startDate, endDate, getSensorDataByRange]);
 
+  const lastTenData = historicalData.slice(Math.max(historicalData.length - 10, 0));
+
+  
   return (
     <ScrollView style={[styles.container, { padding: 16 }]}>
-      <Text style={styles.title}>📊 Dados Históricos da Colmeia</Text>
+      <Text style={styles.title}>Dados Históricos da Colmeia</Text>
 
-      {/* Date Selection */}
       <View style={{ marginVertical: 12, gap: 12 }}>
         <TouchableOpacity
           style={{
@@ -127,7 +128,6 @@ const HistoryScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Date/time selection modal */}
       <DateTimePickerModal
         isVisible={isPickerVisible}
         mode="datetime"
@@ -136,15 +136,22 @@ const HistoryScreen = () => {
         onCancel={hideDateTimePicker}
       />
 
-      {/* Displayed Data */}
       {historicalData.length > 0 ? (
         <>
           <AggregateCard data={historicalData} startDate={startDate} endDate={endDate} />
           <BeeActivityChart data={historicalData} startDate={startDate} endDate={endDate} />
-          <Text style={styles.sectionTitle}>📑 Dados Brutos:</Text>
-          {historicalData.map((item) => (
+          
+          <Text style={styles.sectionTitle}>Últimos Dados Brutos (Máx. 10):</Text>
+
+          {lastTenData.map((item) => (
             <DataCard key={item.id || item.dataHora} data={item} />
           ))}
+          
+          {historicalData.length > 10 && (
+            <Text style={{ fontSize: 14, color: '#9E9E9E', textAlign: 'center', marginTop: 8 }}>
+              ... Exibindo apenas os últimos 10 de {historicalData.length} registros totais.
+            </Text>
+          )}
         </>
       ) : (
         <Text style={styles.noDataText}>
