@@ -36,7 +36,12 @@ export const initDb = async () => {
                 dataHora TEXT NOT NULL
             );`
         );
-        console.log('sensor_data table verified/created.');
+
+        await db.execAsync(
+            `CREATE INDEX IF NOT EXISTS idx_dataHora ON sensor_data (dataHora);`
+        );
+        
+        console.log('sensor_data table verified/created and index idx_dataHora ensured.');
         return db;
     } catch (error) {
         console.error('Error initializing database:', error);
@@ -101,18 +106,6 @@ export const getSensorDataByRange = async (db, startDate, endDate) => {
     if (!db) {
         throw new Error('Database instance not available for fetching data by range.');
     }
-
-    console.log('--- DEBUGGING IN database.js: getSensorDataByRange ---');
-    console.log('Received startDate:', startDate);
-    console.log('Type of received startDate:', typeof startDate);
-    console.log('Is received startDate an instance of Date:', startDate instanceof Date);
-    console.log('Is received startDate valid (isNaN(getTime())):', startDate && !isNaN(startDate.getTime()));
-
-    console.log('Received endDate:', endDate);
-    console.log('Type of received endDate:', typeof endDate);
-    console.log('Is received endDate an instance of Date:', endDate instanceof Date);
-    console.log('Is received endDate valid (isNaN(getTime())):', endDate && !isNaN(endDate.getTime()));
-    console.log('----------------------------------------------------');
 
     if (!(startDate instanceof Date) || isNaN(startDate.getTime())) {
         console.error("Validation failed for startDate in database.js!");
