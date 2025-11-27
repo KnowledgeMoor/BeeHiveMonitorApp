@@ -18,7 +18,7 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <ScrollView style={[styles.container, { padding: 16 }]}>
-      <Text style={styles.title}>🐝 Dados das Colmeias</Text>
+      <Text style={styles.title}>Dados das Colmeias</Text>
       <View
         style={{
           backgroundColor: '#F5F5F5',

@@ -1,54 +1,78 @@
-import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
-import Constants from 'expo-constants';
+import notifee, { AndroidImportance } from '@notifee/react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import messaging, { AuthorizationStatus } from '@react-native-firebase/messaging';
 import { Platform } from 'react-native';
+import { setupForegroundHandler } from '../handler/notificationsHandler';
 
-export const registerForPushNotificationsAsync = async () => {
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF231F7C',
-    });
-  }
+const GLOBAL_TOPIC = 'all_app_users';
+const SUBSCRIPTION_KEY = '@App:isSubscribedToTopic';
 
-  if (!Device.isDevice) {
-    throw new Error('Must use physical device for Push Notifications');
-  }
+const requestPostNotificationPermission = async () => {
+    if (Platform.OS === 'android') {
+        try {
+            const settings = await notifee.getNotificationSettings();
 
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus;
-  if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
-  if (finalStatus !== 'granted') {
-    throw new Error('Failed to get push token for push notification!');
-  }
-  
-  const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.expoConfig?.extra?.projectId;
-  if (!projectId) {
-    throw new Error('Project ID not defined in app configuration.');
-  }
+            if (settings.android.alarmAlert === undefined || settings.android.alarmAlert < AndroidImportance.HIGH) {
+                console.log('Solicitando permissão de Post Notification (Android 13+)...');
+                await notifee.requestPermission();
+            }
+        } catch (e) {
+            console.error("Erro ao solicitar permissão de post notification:", e);
+        }
+    }
+};
 
+export const subscribeToTopic = async () => { 
   try {
-    const pushTokenString = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-    console.log('Push token:', pushTokenString);
-    return pushTokenString;
-  } catch (e) {
-    throw new Error(`Failed to get push token: ${e}`);
+    await messaging().subscribeToTopic(GLOBAL_TOPIC);
+    console.log(`Successfully subscribed to topic: ${GLOBAL_TOPIC}`);
+    await AsyncStorage.setItem(SUBSCRIPTION_KEY, 'true');
+  } catch (error) {
+    console.error(`Subscription failed for topic ${GLOBAL_TOPIC}:`, error);
   }
 };
 
-export const schedulePushNotification = async (title, body, trigger = null) => {
+export const unsubscribeFromTopic = async () => {
   try {
-    await Notifications.scheduleNotificationAsync({
-      content: { title, body, data: { timestamp: new Date().toISOString() } },
-      trigger,
-    });
-    console.log('Notification scheduled:', title);
+    await messaging().unsubscribeFromTopic(GLOBAL_TOPIC);
+    console.log(`Successfully unsubscribed from topic: ${GLOBAL_TOPIC}`);
+    await AsyncStorage.setItem(SUBSCRIPTION_KEY, 'false'); 
   } catch (error) {
-    console.error('Error scheduling notification:', error);
+    console.error(`Unsubscribe failed for topic ${GLOBAL_TOPIC}:`, error);
+  }
+};
+
+export const setupFCMNotifications = async () => {
+  try {
+    const authorizationStatus = await messaging().requestPermission();
+
+    const enabled =
+      authorizationStatus === AuthorizationStatus.AUTHORIZED ||
+      authorizationStatus === AuthorizationStatus.PROVISIONAL;
+
+    if (!enabled) {
+      console.log('User denied notification permissions.');
+      return null;
+    }
+    
+    await requestPostNotificationPermission(); 
+    const fcmToken = await messaging().getToken();
+    console.log('FCM Device Token:', fcmToken);
+
+    const isSubscribed = await AsyncStorage.getItem(SUBSCRIPTION_KEY);
+
+    if (isSubscribed !== 'true') {
+      console.log('First install detected, subscribing to topic...');
+      await subscribeToTopic();
+    } else {
+      console.log('Already subscribed on a previous run. Skipping subscription.');
+    }
+
+    setupForegroundHandler(); 
+
+    return fcmToken;
+  } catch (e) {
+    console.error('FCM Setup Failed:', e);
+    return null;
   }
 };

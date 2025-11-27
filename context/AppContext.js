@@ -1,4 +1,3 @@
-import * as Notifications from 'expo-notifications';
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Text, View } from 'react-native';
 
@@ -12,8 +11,7 @@ import {
     setRetentionSetting
 } from '../api/database';
 import { connectMqtt, disconnectMqtt } from '../api/mqttService';
-import { registerBackgroundFetchTask } from '../services/backgroundTaskService';
-import { registerForPushNotificationsAsync, schedulePushNotification } from '../services/notificationService';
+import { setupFCMNotifications, subscribeToTopic, unsubscribeFromTopic } from '../services/notificationService';
 import { styles } from '../styles/globalStyles';
 
 const AppContext = createContext();
@@ -29,34 +27,19 @@ export const AppProvider = ({ children }) => {
     useEffect(() => {
         const initializeApp = async () => {
             try {
-                Notifications.setNotificationHandler({
-                    handleNotification: async () => ({
-                        shouldShowAlert: true,
-                        shouldPlaySound: true,
-                        shouldSetBadge: false,
-                    }),
-                });
-
                 const db = await initDb();
                 setDatabaseInstance(db); 
                 setDbInitialized(true);
-
-                await registerForPushNotificationsAsync();
-                await registerBackgroundFetchTask();
-
-                const notificationListener = Notifications.addNotificationReceivedListener(n => console.log('Notification received:', n));
-                const responseListener = Notifications.addNotificationResponseReceivedListener(r => console.log('Notification response:', r));
-
-                return () => {
-                    Notifications.removeNotificationSubscription(notificationListener);
-                    Notifications.removeNotificationSubscription(responseListener);
-                };
+                await setupFCMNotifications(); 
             } catch (error) {
                 Alert.alert('Error', 'Failed to initialize app services: ' + error.message);
             }
         };
 
         initializeApp();
+
+        return () => {
+        };
     }, []);
 
     const handleMqttMessage = useCallback(async (data) => {
@@ -64,11 +47,7 @@ export const AppProvider = ({ children }) => {
         if (databaseInstance) { 
             try {
                 await insertSensorData(databaseInstance, data);
-                const { numEntradas = 0, numSaidas = 0, temperaturaInterna = 0 } = data;
-                await schedulePushNotification(
-                    'New Beehive Data',
-                    `Bees: ${numEntradas} in, ${numSaidas} out | Temp: ${temperaturaInterna}°C`
-                );
+                
             } catch (error) {
                 console.error('Error processing MQTT data:', error);
             }
@@ -77,7 +56,6 @@ export const AppProvider = ({ children }) => {
 
     const handleMqttConnectionLost = useCallback(() => {
         console.log('MQTT connection lost, attempting reconnect...');
-        
     }, []);
 
     useEffect(() => {
@@ -96,7 +74,7 @@ export const AppProvider = ({ children }) => {
                 <ActivityIndicator size="large" color="#0000ff" />
                 <Text>Initializing app...</Text>
             </View>
-        );
+        ); 
     }
 
     const value = {
@@ -107,7 +85,8 @@ export const AppProvider = ({ children }) => {
         setRetentionSetting,
         latestSensorData,
         mqttClient,
-        schedulePushNotification,
+        subscribeToTopic,
+        unsubscribeFromTopic,
         getSensorDataByRange: (startDate, endDate) => dbGetSensorDataByRange(databaseInstance, startDate, endDate),
     };
 
